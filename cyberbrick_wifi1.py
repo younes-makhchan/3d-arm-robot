@@ -132,6 +132,7 @@ try:
                         except ValueError:
                             pass
                     elif p.startswith("J"):
+                        has_jog = True
                         jog = p[1:]
                         if jog == "up":
                             motors.set_speed(2, 1024)
@@ -139,6 +140,8 @@ try:
                             motors.set_speed(2, -1024)
                         else:
                             motors.set_speed(2, 0)
+                if not any(p.startswith("J") for p in parts):
+                    motors.set_speed(2, 0)
 
             # Mode B: Legacy Keyboard Packet (comma-separated keys)
             else:

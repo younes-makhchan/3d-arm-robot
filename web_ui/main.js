@@ -198,6 +198,101 @@ document.addEventListener('DOMContentLoaded', () => {
     if (slB) slB.addEventListener('input', (e) => { debugB = parseInt(e.target.value); valB.textContent = `${debugB}°`; });
 });
 
+// --- CLAW & BASE MOTOR STATE ---
+let configuredClawSpeed = 70; // Configured speed from slider (20% - 100%)
+let currentClawSpeed = 0;     // Active speed sent over Wi-Fi
+let currentBaseJog = "";       // "up" (left), "down" (right), or ""
+
+function setClaw(speed, label, color) {
+    currentClawSpeed = speed;
+    const lbl = document.getElementById('clawState');
+    if (lbl) {
+        lbl.textContent = label;
+        lbl.style.color = color;
+    }
+}
+
+function setBaseMotor(direction, label, color) {
+    currentBaseJog = direction;
+    const lbl = document.getElementById('baseMotorState');
+    if (lbl) {
+        lbl.textContent = label;
+        lbl.style.color = color;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Claw Speed Slider
+    const clawSlider = document.getElementById('clawSpeedSlider');
+    const clawVal = document.getElementById('clawSpeedVal');
+    if (clawSlider) {
+        clawSlider.addEventListener('input', (e) => {
+            configuredClawSpeed = parseInt(e.target.value);
+            if (clawVal) clawVal.textContent = `${configuredClawSpeed}%`;
+        });
+    }
+
+    // Claw Buttons (Hold to Run)
+    const btnOpen = document.getElementById('btnClawOpen');
+    const btnClose = document.getElementById('btnClawClose');
+
+    if (btnOpen) {
+        btnOpen.addEventListener('mousedown', () => setClaw(configuredClawSpeed, `OPENING (+${configuredClawSpeed}%)`, "#00ff88"));
+        btnOpen.addEventListener('mouseup', () => setClaw(0, "STOPPED", "#ffaa00"));
+        btnOpen.addEventListener('mouseleave', () => setClaw(0, "STOPPED", "#ffaa00"));
+    }
+
+    if (btnClose) {
+        btnClose.addEventListener('mousedown', () => setClaw(-configuredClawSpeed, `CLOSING (-${configuredClawSpeed}%)`, "#ff0055"));
+        btnClose.addEventListener('mouseup', () => setClaw(0, "STOPPED", "#ffaa00"));
+        btnClose.addEventListener('mouseleave', () => setClaw(0, "STOPPED", "#ffaa00"));
+    }
+
+    // Base Motor Buttons (Hold to Run)
+    const btnBaseLeft = document.getElementById('btnBaseLeft');
+    const btnBaseRight = document.getElementById('btnBaseRight');
+
+    if (btnBaseLeft) {
+        btnBaseLeft.addEventListener('mousedown', () => setBaseMotor("up", "SPINNING LEFT", "#00ffaa"));
+        btnBaseLeft.addEventListener('mouseup', () => setBaseMotor("", "STOPPED", "#888"));
+        btnBaseLeft.addEventListener('mouseleave', () => setBaseMotor("", "STOPPED", "#888"));
+    }
+    if (btnBaseRight) {
+        btnBaseRight.addEventListener('mousedown', () => setBaseMotor("down", "SPINNING RIGHT", "#ffaa00"));
+        btnBaseRight.addEventListener('mouseup', () => setBaseMotor("", "STOPPED", "#888"));
+        btnBaseRight.addEventListener('mouseleave', () => setBaseMotor("", "STOPPED", "#888"));
+    }
+
+    // Keyboard controls (Hold-to-Run):
+    // 'I' = Hold to Open, 'L' = Hold to Close
+    // 'ArrowLeft' = Spin Left, 'ArrowRight' = Spin Right
+    window.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT') return;
+        if (e.repeat) return; // Prevent repeated triggers while held
+
+        const key = e.key.toLowerCase();
+        if (key === 'i') {
+            setClaw(configuredClawSpeed, `OPENING (+${configuredClawSpeed}%)`, "#00ff88");
+        } else if (key === 'l') {
+            setClaw(-configuredClawSpeed, `CLOSING (-${configuredClawSpeed}%)`, "#ff0055");
+        } else if (e.key === 'ArrowLeft') {
+            setBaseMotor("up", "SPINNING LEFT", "#00ffaa");
+        } else if (e.key === 'ArrowRight') {
+            setBaseMotor("down", "SPINNING RIGHT", "#ffaa00");
+        }
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (e.target.tagName === 'INPUT') return;
+        const key = e.key.toLowerCase();
+        if (key === 'i' || key === 'l') {
+            setClaw(0, "STOPPED", "#ffaa00");
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            setBaseMotor("", "STOPPED", "#888");
+        }
+    });
+});
+
 function getDisplayAngles() {
     if (isManualDebug) {
         return {
@@ -215,8 +310,12 @@ function getDisplayAngles() {
 
 function prepareRobotData() {
     const { base, shoulder, elbow } = getDisplayAngles();
-    const elbowangle= Math.abs(elbow-180)
-    return `B${base},S${shoulder},E${elbowangle}\n`;
+    const elbowangle = Math.abs(elbow - 180);
+    let pkt = `B${base},S${shoulder},E${elbowangle},C${currentClawSpeed}`;
+    if (currentBaseJog) {
+        pkt += `,J${currentBaseJog}`;
+    }
+    return pkt + "\n";
 }
 
 function updateAngleDisplay(baseDeg, shoulderDeg, elbowDeg) {
