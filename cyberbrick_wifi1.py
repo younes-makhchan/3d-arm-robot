@@ -114,15 +114,15 @@ try:
                 for p in parts:
                     if p.startswith("S"):
                         try:
-                            val = float(p[1:])
-                            # Shoulder calibration: constrain to 0-180
-                            target_ang[2] = max(0, min(180, val))
+                            # Inverted for physical servo horn orientation: increasing angle lifts the arm UP
+                            raw_s = max(0, min(180, abs(float(p[1:]))))
+                            target_ang[2] = 180 - raw_s  # Shoulder -> Servo 2
                         except ValueError:
                             pass
                     elif p.startswith("E"):
                         try:
-                            # abs() is already handled in main.js — just clamp
-                            target_ang[3] = max(0, min(180, float(p[1:])))  # Elbow -> Servo 3
+                            # Exact positive angle from UI
+                            target_ang[3] = max(0, min(180, abs(float(p[1:]))))  # Elbow -> Servo 3
                         except ValueError:
                             pass
                     elif p.startswith("C"):

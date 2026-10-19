@@ -21,6 +21,7 @@ UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web_ui")
 
 # UDP Socket to CyberBrick
 udp_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+last_udp_packet = b""
 
 
 class BridgeRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -41,8 +42,11 @@ class BridgeRequestHandler(http.server.SimpleHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             raw_data = self.rfile.read(length)
             try:
-                # Forward exact packet (e.g. "B180,S45,E90\n") over UDP to CyberBrick
-                udp_sock.sendto(raw_data, (BRICK_IP, BRICK_PORT))
+                # Only forward over UDP if packet has changed
+                global last_udp_packet
+                if raw_data != last_udp_packet:
+                    last_udp_packet = raw_data
+                    udp_sock.sendto(raw_data, (BRICK_IP, BRICK_PORT))
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()

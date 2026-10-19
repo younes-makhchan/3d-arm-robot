@@ -127,6 +127,7 @@ let port;
 let writer;
 let isSerialConnected = false;
 let lastSendTime = 0;
+let lastSentData = "";
 const sendInterval = 50; // Set to 50ms for smooth real-time control
 const encoder = new TextEncoder(); // Converts string to bytes
 
@@ -197,30 +198,35 @@ document.addEventListener('DOMContentLoaded', () => {
     if (slB) slB.addEventListener('input', (e) => { debugB = parseInt(e.target.value); valB.textContent = `${debugB}°`; });
 });
 
-function prepareRobotData() {
+function getDisplayAngles() {
     if (isManualDebug) {
-        return `B${debugB},S${debugS},E${debugE}\n`;
+        return {
+            base: Math.abs(debugB),
+            shoulder: Math.abs(debugS),
+            elbow: Math.abs(debugE)
+        };
     }
-    const baseDeg = Math.round(currentBaseRotation * (180 / Math.PI));
-    const shoulderDeg = Math.round(currentShoulderAngle * (180 / Math.PI)) + SHOULDER_OFFSET;
-    // Elbow IK angle is always negative -- abs() maps it to 0-180
-    const rawElbow = Math.abs(Math.round(currentElbowAngle * (180 / Math.PI)));
-    const elbowDeg = ELBOW_INVERT ? (180 - rawElbow) : rawElbow;
-    return `B${baseDeg},S${shoulderDeg},E${elbowDeg}\n`;
+    // Exact absolute positive degrees, no offsets
+    const base = Math.abs(Math.round(currentBaseRotation * (180 / Math.PI)));
+    const shoulder = Math.abs(Math.round(currentShoulderAngle * (180 / Math.PI)));
+    const elbow = Math.abs(Math.round(currentElbowAngle * (180 / Math.PI)));
+    return { base, shoulder, elbow };
+}
+
+function prepareRobotData() {
+    const { base, shoulder, elbow } = getDisplayAngles();
+    const elbowangle= Math.abs(elbow-180)
+    return `B${base},S${shoulder},E${elbowangle}\n`;
 }
 
 function updateAngleDisplay(baseDeg, shoulderDeg, elbowDeg) {
-    if (isManualDebug) {
-        baseDeg = debugB;
-        shoulderDeg = debugS;
-        elbowDeg = debugE;
-    }
+    const { base, shoulder, elbow } = getDisplayAngles();
     const b = document.getElementById('baseAngle');
     const s = document.getElementById('shoulderAngle');
     const e = document.getElementById('elbowAngle');
-    if (b) b.textContent = baseDeg;
-    if (s) s.textContent = shoulderDeg;
-    if (e) e.textContent = elbowDeg;
+    if (b) b.textContent = base;
+    if (s) s.textContent = shoulder;
+    if (e) e.textContent = elbow;
 }
 
 // Mouse controls
@@ -291,24 +297,27 @@ function animate(time) {
 
     // 3. UI Display
     const bD = Math.round(currentBaseRotation * (180 / Math.PI));
-    const sD = Math.round(currentShoulderAngle * (180 / Math.PI));
-    const eD = Math.round(currentElbowAngle * (180 / Math.PI));
+    const sD = Math.round((currentShoulderAngle) * (180 / Math.PI));
+    const eD = Math.round((currentElbowAngle) * (180 / Math.PI));
     updateAngleDisplay(bD, sD, eD);
 
-    // 4. --- DATA SENDING ---
+    // 4. --- DATA SENDING (only send when changed) ---
     if (time - lastSendTime > sendInterval) {
         if (isSerialConnected) {
             const data = prepareRobotData();
             
-            fetch('/api/control', {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: data
-            }).catch(err => {
-                console.error("Wi-Fi bridge error:", err);
-            });
+            if (data !== lastSentData) {
+                lastSentData = data;
+                fetch('/api/control', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: data
+                }).catch(err => {
+                    console.error("Wi-Fi bridge error:", err);
+                });
 
-            console.log("📤 Sending via Wi-Fi:", data.trim());
+                console.log("📤 Sending via Wi-Fi:", data.trim());
+            }
         }
         lastSendTime = time;
     }
