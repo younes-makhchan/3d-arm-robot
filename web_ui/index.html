@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 Advanced Robotic Arm Control System</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        /* Serial Connection UI */
+        #serialUI {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 8px 32px rgba(0, 255, 255, 0.1);
+        }
+
+        #connectButton {
+            padding: 10px 20px;
+            background: linear-gradient(45deg, #00ff88, #00aaff);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.4);
+        }
+
+        #connectButton:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 255, 136, 0.6);
+        }
+
+        #connectionStatus {
+            margin-top: 8px;
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        /* Joint Angles Display */
+        #anglesDisplay {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(15px);
+            border: 2px solid rgba(255, 0, 255, 0.5);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(255, 0, 255, 0.2);
+            min-width: 200px;
+        }
+
+        #anglesDisplay b {
+            color: #ff00ff;
+            text-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
+        }
+
+        #anglesDisplay div {
+            margin: 5px 0;
+            color: #ffffff;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        /* Title */
+        #title {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            color: #00ffff;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.8);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+        }
+
+        /* Instructions */
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            color: #ffffff;
+            font-size: 14px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        /* Glow effects */
+        .glow {
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+        /* Responsive adjustments */
+@media (max-width: 600px) {
+    #title {
+        font-size: 16px;
+        width: 80%;
+        top: 10px;
+    }
+
+    #serialUI {
+        top: auto;
+        bottom: 80px; /* Move up to avoid instructions */
+        left: 10px;
+        padding: 8px;
+    }
+
+    #anglesDisplay {
+        top: 60px;
+        right: 10px;
+        min-width: 140px;
+        padding: 10px;
+        font-size: 12px;
+    }
+
+    #instructions {
+        width: 90%;
+        font-size: 11px;
+        padding: 8px;
+        bottom: 10px;
+    }
+}
+canvas {
+    display: block;
+    touch-action: none; /* Prevents the browser from hijacking touch events */
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+    </style>
+
+</head>
+<body>
+
+    <!-- Title -->
+
+    <!-- Serial Connection UI -->
+    <div id="serialUI">
+        <button id="connectButton" class="glow">🔌 Connect Serial</button>
+        <div id="connectionStatus">Not Connected</div>
+    </div>
+
+    <!-- Joint Angles Display -->
+    <div id="anglesDisplay">
+        <div><b>🎯 Robot Joint Angles:</b></div>
+        <div>🔄 Base: <span id="baseAngle">0</span>°</div>
+        <div>💪 Shoulder: <span id="shoulderAngle">0</span>°</div>
+        <div>🦾 Elbow: <span id="elbowAngle">0</span>°</div>
+
+        <!-- Debug / Manual Calibration Sliders -->
+        <div style="margin-top: 15px; border-top: 1px solid rgba(255, 0, 255, 0.3); padding-top: 10px;">
+            <label style="font-size: 12px; color: #00ffff; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="manualDebugToggle"> 🛠️ Manual Servo Debug
+            </label>
+        </div>
+
+        <div id="debugControls" style="display: none; margin-top: 10px; font-size: 12px;">
+            <div style="margin: 6px 0;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Shoulder (S):</span>
+                    <span id="sliderSVal" style="color: #00ff88; font-weight: bold;">90°</span>
+                </div>
+                <input type="range" id="sliderS" min="0" max="180" value="90" style="width: 100%;">
+            </div>
+
+            <div style="margin: 6px 0;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Elbow (E):</span>
+                    <span id="sliderEVal" style="color: #00ff88; font-weight: bold;">90°</span>
+                </div>
+                <input type="range" id="sliderE" min="0" max="180" value="90" style="width: 100%;">
+            </div>
+
+            <div style="margin: 6px 0;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Base (B):</span>
+                    <span id="sliderBVal" style="color: #00ff88; font-weight: bold;">90°</span>
+                </div>
+                <input type="range" id="sliderB" min="0" max="180" value="90" style="width: 100%;">
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions -->
+    <div id="instructions">
+        <b>🎮 Controls:</b><br>
+        🖱️ Drag the glowing sphere • 🔌 Connect serial for hardware control<br>
+        <span style="color: #00ff88;">Watch the robot automatically track your target!</span>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+
+    <script src="main.js"></script>
+
+</body>
+</html>
