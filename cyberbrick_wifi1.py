@@ -123,6 +123,7 @@ try:
 
         # Process Packet if received
         if pkt_str:
+            print("[RECV]", pkt_str)
             # Mode A: Three.js Angle Packet (starts with 'B' or contains 'S' and 'E')
             if "S" in pkt_str and "E" in pkt_str:
                 parts = pkt_str.split(",")
@@ -156,6 +157,7 @@ try:
                             motors.set_speed(2, 0)
                 if not any(p.startswith("J") for p in parts):
                     motors.set_speed(2, 0)
+                print(f" -> Shoulder S2: {int(target_ang[2])} deg | Elbow S3: {int(target_ang[3])} deg")
 
             # Mode B: Legacy Keyboard Packet (comma-separated keys)
             else:

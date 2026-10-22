@@ -1,12 +1,3 @@
-"""
-Web Control Server & WebSocket-to-UDP Bridge for CyberBrick Robotic Arm.
-Serves the Three.js Web UI and provides a high-performance, low-latency WebSocket connection
-that works seamlessly over Cloudflare Tunnel / Ngrok without HTTP rate limits.
-
-Usage:
-    python web_control_server.py [CYBERBRICK_IP]
-    Example: python web_control_server.py 192.168.43.15
-"""
 import asyncio
 import http.server
 import os
@@ -50,12 +41,14 @@ class BridgeRequestHandler(http.server.SimpleHTTPRequestHandler):
                 if raw_data != last_udp_packet:
                     last_udp_packet = raw_data
                     udp_sock.sendto(raw_data, (BRICK_IP, BRICK_PORT))
+                    print(f"[HTTP -> UDP] Sent to {BRICK_IP}:{BRICK_PORT} -> {raw_data.decode(errors='ignore').strip()}")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 self.wfile.write(b'{"status":"sent"}')
             except Exception as e:
+                print(f"[HTTP ERROR]: {e}")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
@@ -69,10 +62,6 @@ class BridgeRequestHandler(http.server.SimpleHTTPRequestHandler):
 
 
 async def ws_handler(websocket):
-    """
-    Handles streaming WebSocket commands from the browser and immediately forwards
-    them as UDP datagrams to the CyberBrick robot.
-    """
     global last_udp_packet
     print("⚡ New WebSocket client connected!")
     try:
@@ -82,8 +71,9 @@ async def ws_handler(websocket):
                 last_udp_packet = raw_data
                 try:
                     udp_sock.sendto(raw_data, (BRICK_IP, BRICK_PORT))
+                    print(f"[WS -> UDP] Sent to {BRICK_IP}:{BRICK_PORT} -> {raw_data.decode(errors='ignore').strip()}")
                 except Exception as e:
-                    pass
+                    print(f"[UDP SEND ERROR]: {e}")
     except websockets.exceptions.ConnectionClosed:
         pass
     finally:
@@ -97,7 +87,7 @@ def start_http_server():
 
 async def start_ws_server():
     async with websockets.serve(ws_handler, "0.0.0.0", WS_PORT):
-        await asyncio.Future()  # run forever
+        await asyncio.Future()
 
 
 def main():
@@ -108,7 +98,6 @@ def main():
     print(f" Target Robot:  {BRICK_IP}:{BRICK_PORT}")
     print("=" * 65)
 
-    # Start HTTP static file server in a background thread
     http_thread = threading.Thread(target=start_http_server, daemon=True)
     http_thread.start()
 
@@ -116,7 +105,6 @@ def main():
     print(f"WebSocket Server listening on port {WS_PORT}")
     print("Ready for connections! Press Ctrl+C to stop.\n")
 
-    # Run WebSocket async server on the main thread
     try:
         asyncio.run(start_ws_server())
     except KeyboardInterrupt:

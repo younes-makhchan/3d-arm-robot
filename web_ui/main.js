@@ -130,33 +130,62 @@ coordinateDiv.style.padding = '10px';
 coordinateDiv.style.fontFamily = 'monospace';
 document.body.appendChild(coordinateDiv);
 
-// --- SERIAL COMMUNICATION LOGIC ---
+// --- WEBSOCKET & SERIAL COMMUNICATION LOGIC ---
 let port;
 let writer;
+let wsClient = null;
 let isSerialConnected = false;
 let lastSendTime = 0;
 let lastSentData = "";
 const sendInterval = 50; // Set to 50ms for smooth real-time control
 const encoder = new TextEncoder(); // Converts string to bytes
 
-async function connectSerial() {
+function initWebSocket() {
+    if (wsClient && (wsClient.readyState === WebSocket.OPEN || wsClient.readyState === WebSocket.CONNECTING)) {
+        return;
+    }
+    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.hostname || 'localhost';
+    const wsUrl = `${wsProto}//${wsHost}:8765`;
+
     try {
-        const res = await fetch('/api/status');
-        if (res.ok) {
+        console.log("Connecting to WebSocket:", wsUrl);
+        wsClient = new WebSocket(wsUrl);
+
+        wsClient.onopen = () => {
             isSerialConnected = true;
-            updateConnectionStatus("Connected (Wi-Fi)");
-            console.log("🚀 CyberBrick Wi-Fi Bridge Connected!");
-        } else {
-            throw new Error("Bridge offline");
-        }
-    } catch (err) {
-        // Even if direct fetch fails, allow manual toggle
+            updateConnectionStatus("Connected (WebSocket ⚡)");
+            console.log("🚀 WebSocket connected with zero-latency streaming!");
+        };
+
+        wsClient.onclose = () => {
+            isSerialConnected = false;
+            updateConnectionStatus("Disconnected");
+            console.log("WebSocket closed. Retrying in 2s...");
+            setTimeout(initWebSocket, 2000);
+        };
+
+        wsClient.onerror = (err) => {
+            console.warn("WebSocket error, falling back to HTTP tunnel:", err);
+            isSerialConnected = true; // Still allow sending commands via HTTP tunnel!
+            updateConnectionStatus("Connected (Tunnel 🌐)");
+        };
+    } catch (e) {
+        console.error("Failed to initialize WebSocket:", e);
+    }
+}
+
+async function connectSerial() {
+    if (!wsClient || wsClient.readyState !== WebSocket.OPEN) {
+        initWebSocket();
+    } else {
         isSerialConnected = !isSerialConnected;
-        updateConnectionStatus(isSerialConnected ? "Connected (Wi-Fi)" : "Disconnected");
+        updateConnectionStatus(isSerialConnected ? "Connected (WebSocket ⚡)" : "Disconnected");
     }
 }
 
 async function readLoop() {
+    if (!port || !port.readable) return;
     const reader = port.readable.getReader();
     const decoder = new TextDecoder();
     try {
@@ -185,7 +214,7 @@ let isManualDebug = false;
 let debugS = 90, debugE = 90, debugB = 90;
 
 document.addEventListener('DOMContentLoaded', () => {
-    initWebSocket();
+
     const toggle = document.getElementById('manualDebugToggle');
     const panel = document.getElementById('debugControls');
     const slS = document.getElementById('sliderS');
@@ -231,7 +260,7 @@ function setBaseMotor(direction, label, color) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    initWebSocket();
+
     // Claw Speed Slider
     const clawSlider = document.getElementById('clawSpeedSlider');
     const clawVal = document.getElementById('clawSpeedVal');
@@ -391,7 +420,7 @@ document.addEventListener('mouseup', () => isDragging = false);
 
 // UI Listeners
 document.addEventListener('DOMContentLoaded', () => {
-    initWebSocket();
+
     const btn = document.getElementById('connectButton');
     if (btn) btn.addEventListener('click', connectSerial);
 });
@@ -528,3 +557,4 @@ document.addEventListener('touchmove', (e) => {
 document.addEventListener('touchend', () => {
     isDragging = false;
 });
+document.addEventListener('DOMContentLoaded', initWebSocket);
