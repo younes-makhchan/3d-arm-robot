@@ -324,6 +324,12 @@ document.addEventListener('DOMContentLoaded', () => {
         () => setBaseMotor("", "STOPPED", "#888")
     );
 
+    // Idle Button
+    const btnIdle = document.getElementById('btnIdleMode');
+    if (btnIdle) {
+        btnIdle.addEventListener('click', toggleIdleMode);
+    }
+
     // Keyboard controls (Hold-to-Run):
     // 'I' = Hold to Open, 'L' = Hold to Close
     // 'ArrowLeft' = Spin Left, 'ArrowRight' = Spin Right
@@ -394,7 +400,7 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let isDragging = false;
 let currentShoulderAngle = 0, currentElbowAngle = 0, currentBaseRotation = 0;
-const smoothing = 0.08;
+const smoothing = 0.35; // Increased responsiveness for instant motion
 
 document.addEventListener('mousedown', (e) => {
     mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -425,9 +431,82 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btn) btn.addEventListener('click', connectSerial);
 });
 
+// --- IDLE ANIMATION ROUTINE (Smooth Sine Waves + Simultaneous Claw Action) ---
+let isIdleRunning = false;
+let idleStartTime = 0;
+
+function toggleIdleMode() {
+    if (isIdleRunning) {
+        stopIdleMode();
+    } else {
+        startIdleMode();
+    }
+}
+
+function startIdleMode() {
+    isIdleRunning = true;
+    idleStartTime = performance.now();
+    const btn = document.getElementById('btnIdleMode');
+    if (btn) {
+        btn.textContent = "⏹ Stop Idle Routine";
+        btn.style.background = "rgba(255, 0, 100, 0.3)";
+        btn.style.borderColor = "#ff0055";
+        btn.style.color = "#ff0055";
+    }
+}
+
+function stopIdleMode() {
+    isIdleRunning = false;
+    setClaw(0, "STOPPED", "#ffaa00");
+    const btn = document.getElementById('btnIdleMode');
+    if (btn) {
+        btn.textContent = "▶ Start Idle Routine";
+        btn.style.background = "rgba(0, 255, 255, 0.2)";
+        btn.style.borderColor = "#00ffff";
+        btn.style.color = "#00ffff";
+    }
+}
+
+function updateIdleRoutine(time) {
+    if (!isIdleRunning) return;
+
+    // Cycle duration: 5 seconds per complete loop
+    const period = 5000;
+    const progress = ((time - idleStartTime) % period) / period; // 0.0 to 1.0
+
+    // Smooth sinusoidal motion between Y = 1.0 (down) and Y = 3.2 (up)
+    // progress: 0 -> 0.5 (moves UP), 0.5 -> 1.0 (moves DOWN)
+    const sinWave = (1 - Math.cos(progress * Math.PI * 2)) / 2; // 0.0 to 1.0
+    const targetY = 1.0 + sinWave * 2.2;
+    const targetX = 2.1;
+
+    // Move target sphere continuously and smoothly
+    sphere.position.x = targetX;
+    sphere.position.y = targetY;
+
+    // Phase 1: Going UP (progress 0.05 to 0.45) -> Claw OPENS at same time
+    if (progress > 0.05 && progress < 0.45) {
+        setClaw(-configuredClawSpeed, "OPENING (Going Up)", "#00ff88");
+    }
+    // Phase 2: Going DOWN (progress 0.55 to 0.95) -> Claw CLOSES at same time
+    else if (progress > 0.55 && progress < 0.95) {
+        setClaw(configuredClawSpeed, "CLOSING (Going Down)", "#ff0055");
+    }
+    // Brief pause at inflection points
+    else {
+        setClaw(0, "RESTING", "#ffaa00");
+    }
+}
+
+
 // Animation Loop
 function animate(time) {
     requestAnimationFrame(animate);
+
+    // Run smooth Idle routine if active
+    if (typeof updateIdleRoutine === 'function') {
+        updateIdleRoutine(time);
+    }
 
     const tx = sphere.position.x - shoulderJoint.position.x;
     const ty = sphere.position.y - shoulderJoint.position.y;
@@ -558,3 +637,5 @@ document.addEventListener('touchend', () => {
     isDragging = false;
 });
 document.addEventListener('DOMContentLoaded', initWebSocket);
+
+
