@@ -73,11 +73,13 @@ try:
             sys.exit(1)
 
     ip = sta.ifconfig()[0]
-    print("\n=========================================")
-    print(" CONNECTED TO MOBILE HOTSPOT!")
+    print("\n[+] Wi-Fi connected successfully!")
+    print("=========================================")
+    print(" [OK] CONNECTED TO MOBILE HOTSPOT!")
     print(" Hotspot SSID: ", SSID_HOTSPOT)
     print(" CyberBrick IP:", ip)
     print(" UDP Port:     ", PORT)
+    print(" Ready to receive commands...")
     print("=========================================")
 
     # ---- Actuators ----
@@ -99,7 +101,7 @@ try:
     sock.bind(("0.0.0.0", PORT))
     sock.setblocking(False)
 
-    last_rx = time.ticks_ms()
+    last_rx = 0
     last_step = time.ticks_ms()
     last_dbg = time.ticks_ms()
 
@@ -108,6 +110,8 @@ try:
         try:
             data, addr = sock.recvfrom(128)
             pkt_str = data.decode().strip()
+            if last_rx == 0:
+                print(f"[+] First command packet received from {addr[0]}:{addr[1]}")
             last_rx = time.ticks_ms()
         except OSError:
             pass

@@ -1,22 +1,24 @@
 """
-Web Control Server & Wi-Fi UDP Bridge for CyberBrick Robotic Arm.
-Serves the EXACT ArmRobot Three.js Web UI.
+Web Control Server & WebSocket-to-UDP Bridge for CyberBrick Robotic Arm.
+Serves the Three.js Web UI and provides a high-performance, low-latency WebSocket connection
+that works seamlessly over Cloudflare Tunnel / Ngrok without HTTP rate limits.
 
-1. Connect laptop Wi-Fi to 'CyberBrick_Bot' (pass: 12345678).
-2. Run:
-     python web_control_server.py
-3. Open http://localhost:8080 in your browser.
+Usage:
+    python web_control_server.py [CYBERBRICK_IP]
+    Example: python web_control_server.py 192.168.43.15
 """
+import asyncio
 import http.server
 import os
 import socket
 import sys
 import threading
-import time
+import websockets
 
 BRICK_IP = sys.argv[1] if len(sys.argv) > 1 else "192.168.4.1"
 BRICK_PORT = 4210
 WEB_PORT = 8080
+WS_PORT = 8765
 UI_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web_ui")
 
 # UDP Socket to CyberBrick
@@ -32,27 +34,30 @@ class BridgeRequestHandler(http.server.SimpleHTTPRequestHandler):
         if self.path == "/api/status":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(b'{"status":"connected"}')
         else:
             super().do_GET()
 
     def do_POST(self):
+        # Fallback HTTP POST endpoint for compatibility
         if self.path == "/api/control":
             length = int(self.headers.get("Content-Length", 0))
             raw_data = self.rfile.read(length)
             try:
-                # Only forward over UDP if packet has changed
                 global last_udp_packet
                 if raw_data != last_udp_packet:
                     last_udp_packet = raw_data
                     udp_sock.sendto(raw_data, (BRICK_IP, BRICK_PORT))
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 self.wfile.write(b'{"status":"sent"}')
             except Exception as e:
-                self.send_response(500)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(str(e).encode())
         else:
@@ -60,25 +65,62 @@ class BridgeRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
 
     def log_message(self, format, *args):
-        # Silence routine HTTP requests
         return
 
 
-def main():
-    print("=" * 60)
-    print("🤖 CyberBrick Three.js IK Control Server")
-    print(f" Web UI:     http://localhost:{WEB_PORT}")
-    print(f" CyberBrick: {BRICK_IP}:{BRICK_PORT}")
-    print("=" * 60)
-
-    server = http.server.HTTPServer(("0.0.0.0", WEB_PORT), BridgeRequestHandler)
-    print(f"Open http://localhost:{WEB_PORT} in your browser.")
+async def ws_handler(websocket):
+    """
+    Handles streaming WebSocket commands from the browser and immediately forwards
+    them as UDP datagrams to the CyberBrick robot.
+    """
+    global last_udp_packet
+    print("⚡ New WebSocket client connected!")
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nStopping server...")
+        async for message in websocket:
+            raw_data = message.encode("utf-8") if isinstance(message, str) else message
+            if raw_data != last_udp_packet:
+                last_udp_packet = raw_data
+                try:
+                    udp_sock.sendto(raw_data, (BRICK_IP, BRICK_PORT))
+                except Exception as e:
+                    pass
+    except websockets.exceptions.ConnectionClosed:
+        pass
     finally:
-        server.server_close()
+        print("⚡ WebSocket client disconnected.")
+
+
+def start_http_server():
+    server = http.server.HTTPServer(("0.0.0.0", WEB_PORT), BridgeRequestHandler)
+    server.serve_forever()
+
+
+async def start_ws_server():
+    async with websockets.serve(ws_handler, "0.0.0.0", WS_PORT):
+        await asyncio.Future()  # run forever
+
+
+def main():
+    print("=" * 65)
+    print("🤖 CyberBrick Three.js WebSocket + UDP Bridge Server")
+    print(f" Web UI:        http://localhost:{WEB_PORT}")
+    print(f" WebSocket:     ws://0.0.0.0:{WS_PORT}")
+    print(f" Target Robot:  {BRICK_IP}:{BRICK_PORT}")
+    print("=" * 65)
+
+    # Start HTTP static file server in a background thread
+    http_thread = threading.Thread(target=start_http_server, daemon=True)
+    http_thread.start()
+
+    print(f"HTTP Server running at http://localhost:{WEB_PORT}")
+    print(f"WebSocket Server listening on port {WS_PORT}")
+    print("Ready for connections! Press Ctrl+C to stop.\n")
+
+    # Run WebSocket async server on the main thread
+    try:
+        asyncio.run(start_ws_server())
+    except KeyboardInterrupt:
+        print("\nStopping servers...")
 
 
 if __name__ == "__main__":

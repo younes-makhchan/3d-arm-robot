@@ -185,6 +185,7 @@ let isManualDebug = false;
 let debugS = 90, debugE = 90, debugB = 90;
 
 document.addEventListener('DOMContentLoaded', () => {
+    initWebSocket();
     const toggle = document.getElementById('manualDebugToggle');
     const panel = document.getElementById('debugControls');
     const slS = document.getElementById('sliderS');
@@ -230,6 +231,7 @@ function setBaseMotor(direction, label, color) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    initWebSocket();
     // Claw Speed Slider
     const clawSlider = document.getElementById('clawSpeedSlider');
     const clawVal = document.getElementById('clawSpeedVal');
@@ -389,6 +391,7 @@ document.addEventListener('mouseup', () => isDragging = false);
 
 // UI Listeners
 document.addEventListener('DOMContentLoaded', () => {
+    initWebSocket();
     const btn = document.getElementById('connectButton');
     if (btn) btn.addEventListener('click', connectSerial);
 });
@@ -437,15 +440,16 @@ function animate(time) {
             
             if (data !== lastSentData) {
                 lastSentData = data;
-                fetch('/api/control', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: data
-                }).catch(err => {
-                    console.error("Wi-Fi bridge error:", err);
-                });
-
-                console.log("📤 Sending via Wi-Fi:", data.trim());
+                if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+                    wsClient.send(data);
+                } else {
+                    fetch('/api/control', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain' },
+                        body: data
+                    }).catch(() => {});
+                }
+                console.log("📤 Streaming:", data.trim());
             }
         }
         lastSendTime = time;
