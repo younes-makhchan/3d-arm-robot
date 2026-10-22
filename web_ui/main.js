@@ -11,8 +11,16 @@ const scene = new THREE.Scene();
 
 // Camera positioned along z-axis, looking towards x-y plane
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 0, -10); 
-camera.lookAt(0, 0, 0); 
+
+function adjustCameraForScreen() {
+    // Zoom out by ~30% so you have plenty of room to drag the red ball to full extension without hitting screen edges
+    const isMobile = window.innerWidth <= 768;
+    const zDist = isMobile ? -19 : -14;
+    const yOffset = isMobile ? 2.5 : 0;
+    camera.position.set(0, yOffset, zDist);
+    camera.lookAt(0, yOffset - 0.5, 0);
+}
+adjustCameraForScreen(); 
 
 // Enhanced Renderer
 const renderer = new THREE.WebGLRenderer({
@@ -232,36 +240,58 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Helper to bind both mouse and touch for momentary hold-to-run
+    function bindHoldAction(btn, onStart, onEnd) {
+        if (!btn) return;
+        // Mouse events (laptop / desktop)
+        btn.addEventListener('mousedown', (e) => { e.preventDefault(); onStart(); });
+        btn.addEventListener('mouseup', (e) => { e.preventDefault(); onEnd(); });
+        btn.addEventListener('mouseleave', () => onEnd());
+        // Touch events (mobile phones / tablets)
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onStart();
+        }, { passive: false });
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onEnd();
+        }, { passive: false });
+        btn.addEventListener('touchcancel', () => onEnd());
+    }
+
     // Claw Buttons (Hold to Run)
     const btnOpen = document.getElementById('btnClawOpen');
     const btnClose = document.getElementById('btnClawClose');
 
-    if (btnOpen) {
-        btnOpen.addEventListener('mousedown', () => setClaw(configuredClawSpeed, `OPENING (+${configuredClawSpeed}%)`, "#00ff88"));
-        btnOpen.addEventListener('mouseup', () => setClaw(0, "STOPPED", "#ffaa00"));
-        btnOpen.addEventListener('mouseleave', () => setClaw(0, "STOPPED", "#ffaa00"));
-    }
+    bindHoldAction(
+        btnOpen,
+        () => setClaw(-configuredClawSpeed, `OPENING`, "#00ff88"),
+        () => setClaw(0, "STOPPED", "#ffaa00")
+    );
 
-    if (btnClose) {
-        btnClose.addEventListener('mousedown', () => setClaw(-configuredClawSpeed, `CLOSING (-${configuredClawSpeed}%)`, "#ff0055"));
-        btnClose.addEventListener('mouseup', () => setClaw(0, "STOPPED", "#ffaa00"));
-        btnClose.addEventListener('mouseleave', () => setClaw(0, "STOPPED", "#ffaa00"));
-    }
+    bindHoldAction(
+        btnClose,
+        () => setClaw(+configuredClawSpeed, `CLOSING`, "#ff0055"),
+        () => setClaw(0, "STOPPED", "#ffaa00")
+    );
 
     // Base Motor Buttons (Hold to Run)
     const btnBaseLeft = document.getElementById('btnBaseLeft');
     const btnBaseRight = document.getElementById('btnBaseRight');
 
-    if (btnBaseLeft) {
-        btnBaseLeft.addEventListener('mousedown', () => setBaseMotor("up", "SPINNING LEFT", "#00ffaa"));
-        btnBaseLeft.addEventListener('mouseup', () => setBaseMotor("", "STOPPED", "#888"));
-        btnBaseLeft.addEventListener('mouseleave', () => setBaseMotor("", "STOPPED", "#888"));
-    }
-    if (btnBaseRight) {
-        btnBaseRight.addEventListener('mousedown', () => setBaseMotor("down", "SPINNING RIGHT", "#ffaa00"));
-        btnBaseRight.addEventListener('mouseup', () => setBaseMotor("", "STOPPED", "#888"));
-        btnBaseRight.addEventListener('mouseleave', () => setBaseMotor("", "STOPPED", "#888"));
-    }
+    bindHoldAction(
+        btnBaseLeft,
+        () => setBaseMotor("up", "SPINNING LEFT", "#00ffaa"),
+        () => setBaseMotor("", "STOPPED", "#888")
+    );
+
+    bindHoldAction(
+        btnBaseRight,
+        () => setBaseMotor("down", "SPINNING RIGHT", "#ffaa00"),
+        () => setBaseMotor("", "STOPPED", "#888")
+    );
 
     // Keyboard controls (Hold-to-Run):
     // 'I' = Hold to Open, 'L' = Hold to Close
@@ -432,6 +462,7 @@ function animate(time) {
 animate();
 
 window.addEventListener('resize', () => {
+    adjustCameraForScreen();
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -472,14 +503,20 @@ document.addEventListener('mouseup', () => isDragging = false);
 
 // --- TOUCH LISTENERS FOR MOBILE ---
 document.addEventListener('touchstart', (e) => {
-    // Prevent scrolling while touching the robot area
-    if (e.target.tagName !== 'BUTTON') e.preventDefault(); 
+    // If touching controls card or buttons, do not drag the 3D scene
+    if (e.target.closest('#anglesDisplay') || e.target.closest('#serialUI') || e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') {
+        return;
+    }
+    e.preventDefault(); 
     const touch = e.touches[0];
     onPointerDown(touch.clientX, touch.clientY);
 }, { passive: false });
 
 document.addEventListener('touchmove', (e) => {
-    if (e.target.tagName !== 'BUTTON') e.preventDefault();
+    if (e.target.closest('#anglesDisplay') || e.target.closest('#serialUI') || e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') {
+        return;
+    }
+    e.preventDefault();
     const touch = e.touches[0];
     onPointerMove(touch.clientX, touch.clientY);
 }, { passive: false });

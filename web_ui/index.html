@@ -119,42 +119,71 @@
         .glow {
             box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
         }
-        /* Responsive adjustments */
-@media (max-width: 600px) {
-    #title {
-        font-size: 16px;
-        width: 80%;
-        top: 10px;
-    }
+        /* Responsive adjustments for Mobile */
+        @media (max-width: 768px) {
+            #instructions {
+                display: none !important;
+            }
 
-    #serialUI {
-        top: auto;
-        bottom: 80px; /* Move up to avoid instructions */
-        left: 10px;
-        padding: 8px;
-    }
+            #jointAnglesText {
+                display: none !important;
+            }
 
-    #anglesDisplay {
-        top: 60px;
-        right: 10px;
-        min-width: 140px;
-        padding: 10px;
-        font-size: 12px;
-    }
+            #debugToggleContainer {
+                display: none !important;
+            }
 
-    #instructions {
-        width: 90%;
-        font-size: 11px;
-        padding: 8px;
-        bottom: 10px;
-    }
-}
-canvas {
-    display: block;
-    touch-action: none; /* Prevents the browser from hijacking touch events */
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-}
+            #serialUI {
+                top: 10px;
+                left: 10px;
+                padding: 6px 10px;
+                z-index: 1001;
+            }
+
+            #connectButton {
+                padding: 6px 12px;
+                font-size: 11px;
+            }
+
+            #connectionStatus {
+                font-size: 10px;
+                margin-top: 4px;
+            }
+
+            /* Move controls card to bottom center */
+            #anglesDisplay {
+                top: auto;
+                bottom: 15px;
+                left: 50%;
+                right: auto;
+                transform: translateX(-50%);
+                width: 90%;
+                max-width: 340px;
+                padding: 10px 14px;
+                border-radius: 12px;
+                border: 1px solid rgba(0, 255, 255, 0.4);
+                background: rgba(10, 15, 30, 0.92);
+                backdrop-filter: blur(12px);
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+            }
+
+            .mobile-compact-section {
+                margin-top: 6px !important;
+                padding-top: 6px !important;
+            }
+
+            .mobile-compact-section button {
+                padding: 7px 4px !important;
+                font-size: 11px !important;
+            }
+        }
+
+        canvas {
+            display: block;
+            touch-action: none; /* Prevents the browser from hijacking touch events */
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
     </style>
 
 </head>
@@ -168,15 +197,17 @@ canvas {
         <div id="connectionStatus">Not Connected</div>
     </div>
 
-    <!-- Joint Angles Display -->
+    <!-- Joint Angles & Control Card -->
     <div id="anglesDisplay">
-        <div><b>🎯 Robot Joint Angles:</b></div>
-        <div>🔄 Base: <span id="baseAngle">0</span>°</div>
-        <div>💪 Shoulder: <span id="shoulderAngle">0</span>°</div>
-        <div>🦾 Elbow: <span id="elbowAngle">0</span>°</div>
+        <div id="jointAnglesText">
+            <div><b>🎯 Robot Joint Angles:</b></div>
+            <div>🔄 Base: <span id="baseAngle">0</span>°</div>
+            <div>💪 Shoulder: <span id="shoulderAngle">0</span>°</div>
+            <div>🦾 Elbow: <span id="elbowAngle">0</span>°</div>
+        </div>
 
         <!-- Debug / Manual Calibration Sliders -->
-        <div style="margin-top: 15px; border-top: 1px solid rgba(255, 0, 255, 0.3); padding-top: 10px;">
+        <div id="debugToggleContainer" style="margin-top: 15px; border-top: 1px solid rgba(255, 0, 255, 0.3); padding-top: 10px;">
             <label style="font-size: 12px; color: #00ffff; display: flex; align-items: center; gap: 6px; cursor: pointer;">
                 <input type="checkbox" id="manualDebugToggle"> 🛠️ Manual Servo Debug
             </label>
@@ -208,35 +239,35 @@ canvas {
             </div>
         </div>
 
-        <!-- Claw Controls (360 Continuous Servo: Hold-to-Run + Speed Slider) -->
-        <div style="margin-top: 15px; border-top: 1px solid rgba(0, 255, 255, 0.3); padding-top: 10px;">
+        <!-- Claw Controls (360 Continuous Servo: Speed Slider) -->
+        <div class="mobile-compact-section" style="margin-top: 15px; border-top: 1px solid rgba(0, 255, 255, 0.3); padding-top: 10px;">
             <div style="display: flex; justify-content: space-between; font-size: 12px; color: #00ffff; font-weight: bold; margin-bottom: 6px;">
-                <span>🦀 Claw (Hold to Run):</span>
+                <span>🦀 Claw:</span>
                 <span id="clawState" style="color: #ffaa00;">STOPPED</span>
             </div>
             
             <div style="margin: 6px 0; font-size: 11px;">
                 <div style="display: flex; justify-content: space-between; color: #cbd5e1; margin-bottom: 3px;">
-                    <span>Speed / Grip Force:</span>
+                    <span>Grip Force:</span>
                     <span id="clawSpeedVal" style="color: #00ff88; font-weight: bold;">70%</span>
                 </div>
                 <input type="range" id="clawSpeedSlider" min="20" max="100" value="70" style="width: 100%;">
             </div>
 
             <div style="display: flex; gap: 6px; margin-top: 4px;">
-                <button id="btnClawOpen" style="flex: 1; padding: 7px 4px; background: rgba(0, 255, 136, 0.2); border: 1px solid #00ff88; color: #fff; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold;">Hold to Open (I)</button>
-                <button id="btnClawClose" style="flex: 1; padding: 7px 4px; background: rgba(255, 0, 100, 0.2); border: 1px solid #ff0055; color: #fff; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold;">Hold to Close (L)</button>
+                <button id="btnClawOpen" style="flex: 1; padding: 7px 4px; background: rgba(0, 255, 136, 0.2); border: 1px solid #00ff88; color: #fff; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold;">Open</button>
+                <button id="btnClawClose" style="flex: 1; padding: 7px 4px; background: rgba(255, 0, 100, 0.2); border: 1px solid #ff0055; color: #fff; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold;">Close</button>
             </div>
         </div>
 
         <!-- Base Motor Spin Controls -->
-        <div style="margin-top: 15px; border-top: 1px solid rgba(255, 170, 0, 0.3); padding-top: 10px;">
+        <div class="mobile-compact-section" style="margin-top: 15px; border-top: 1px solid rgba(255, 170, 0, 0.3); padding-top: 10px;">
             <div style="font-size: 12px; color: #ffaa00; font-weight: bold; margin-bottom: 6px;">
                 🔄 Base Motor: <span id="baseMotorState" style="color: #888;">STOPPED</span>
             </div>
             <div style="display: flex; gap: 6px;">
-                <button id="btnBaseLeft" style="flex: 1; padding: 6px 4px; background: rgba(255, 170, 0, 0.2); border: 1px solid #ffaa00; color: #fff; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold;">◀ Spin Left (←)</button>
-                <button id="btnBaseRight" style="flex: 1; padding: 6px 4px; background: rgba(255, 170, 0, 0.2); border: 1px solid #ffaa00; color: #fff; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold;">Spin Right (→) ▶</button>
+                <button id="btnBaseLeft" style="flex: 1; padding: 6px 4px; background: rgba(255, 170, 0, 0.2); border: 1px solid #ffaa00; color: #fff; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold;">◀Left</button>
+                <button id="btnBaseRight" style="flex: 1; padding: 6px 4px; background: rgba(255, 170, 0, 0.2); border: 1px solid #ffaa00; color: #fff; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold;">Right▶</button>
             </div>
         </div>
     </div>
@@ -248,13 +279,13 @@ canvas {
         <span style="color: #00ff88;">Watch the robot automatically track your target!</span>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="libs/three.min.js"></script>
+    <script src="libs/CopyShader.js"></script>
+    <script src="libs/LuminosityHighPassShader.js"></script>
+    <script src="libs/EffectComposer.js"></script>
+    <script src="libs/RenderPass.js"></script>
+    <script src="libs/UnrealBloomPass.js"></script>
+    <script src="libs/ShaderPass.js"></script>
 
     <script src="main.js"></script>
 
