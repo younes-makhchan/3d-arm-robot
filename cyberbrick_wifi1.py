@@ -1,7 +1,6 @@
 """
-CyberBrick Wi-Fi receiver v6 (Access Point mode).
-Enhanced with Three.js Inverse Kinematics (B...,S...,E...) Direct-Angle control
-while retaining 100% backward-compatibility with keyboard-based UDP control.
+CyberBrick Wi-Fi receiver v7 (Station / Mobile Hotspot mode).
+Connects to phone hotspot (SSID: 303) and listens for Three.js UDP control packets.
 
 Run from your laptop over USB:
     mpremote connect COM5 run cyberbrick_wifi1.py
@@ -14,16 +13,16 @@ import machine
 from bbl.servos import ServosController
 from bbl.motors import MotorsController
 
-SSID_AP = "CyberBrick_Bot"
-PASSWORD_AP = "12345678"       # at least 8 characters
+SSID_HOTSPOT = "303"
+PASSWORD_HOTSPOT = "jinriquan1992"
 PORT = 4210
 FAILSAFE_MS = 600
 LOG_FILE = "crash_log.txt"
 
 # Smoothing & Stepping parameters
-STEP_DEG = 1          # for keyboard jog
+STEP_DEG = 1
 STEP_MS = 15
-LERP_SPEED = 0.15     # for smooth motion interpolation (0.05 to 0.25)
+LERP_SPEED = 0.15
 
 RESET_NAMES = {
     getattr(machine, n): n
@@ -47,22 +46,38 @@ print("Reset cause:", RESET_NAMES.get(machine.reset_cause(), machine.reset_cause
 servos = None
 motors = None
 sock = None
-ap = None
+sta = None
 
 try:
-    # ---- Access point ----
+    # ---- Connect to Mobile Hotspot (Station Mode) ----
+    # Ensure AP mode is disabled
     ap = network.WLAN(network.AP_IF)
     ap.active(False)
+
+    sta = network.WLAN(network.STA_IF)
+    sta.active(False)
+    time.sleep_ms(200)
+    sta.active(True)
     time.sleep_ms(300)
-    ap.active(True)
-    time.sleep_ms(500)
-    ap.config(essid=SSID_AP, password=PASSWORD_AP, authmode=network.AUTH_WPA2_PSK)
-    while not ap.active():
-        time.sleep_ms(100)
-    ip = ap.ifconfig()[0]
-    print("=========================================")
-    print("Access point up. SSID:", SSID_AP, " password:", PASSWORD_AP)
-    print("CyberBrick IP:", ip, " Port:", PORT)
+
+    print("Connecting to Hotspot:", SSID_HOTSPOT, "...")
+    sta.connect(SSID_HOTSPOT, PASSWORD_HOTSPOT)
+
+    timeout_s = 20
+    start_time = time.time()
+    while not sta.isconnected():
+        time.sleep_ms(300)
+        print(".", end="")
+        if time.time() - start_time > timeout_s:
+            print("\nFailed to connect within timeout! Check hotspot SSID/password & 2.4GHz band.")
+            sys.exit(1)
+
+    ip = sta.ifconfig()[0]
+    print("\n=========================================")
+    print(" CONNECTED TO MOBILE HOTSPOT!")
+    print(" Hotspot SSID: ", SSID_HOTSPOT)
+    print(" CyberBrick IP:", ip)
+    print(" UDP Port:     ", PORT)
     print("=========================================")
 
     # ---- Actuators ----
@@ -70,10 +85,6 @@ try:
     motors = MotorsController()
     period_cb = getattr(motors, "motors_period_cb", None)
 
-    # Servo 2: Shoulder (0-180)
-    # Servo 3: Elbow (0-180)
-    # Servo 1: Claw (continuous rotation speed: -50, 0, 50)
-    # Motor 2: Base rotation turntable
     servos.set_angle(2, 90)
     servos.set_angle(3, 90)
     servos.set_speed(1, 0)
@@ -132,7 +143,6 @@ try:
                         except ValueError:
                             pass
                     elif p.startswith("J"):
-                        has_jog = True
                         jog = p[1:]
                         if jog == "up":
                             motors.set_speed(2, 1024)
